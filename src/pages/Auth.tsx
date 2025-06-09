@@ -111,7 +111,7 @@ const Auth = () => {
               <Store className="h-8 w-8" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">J. Sumampong POS System</CardTitle>
+          <CardTitle className="text-2xl font-bold">POS System</CardTitle>
           <CardDescription>
             Para sa mga admin lang ang sistema na ito
           </CardDescription>
