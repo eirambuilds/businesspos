@@ -7,7 +7,7 @@ export interface Credit {
   id: string;
   customer_name: string;
   amount_owed: number;
-  items: any;
+  items: any[];
   is_paid: boolean;
   paid_date?: string;
   created_at: string;
@@ -26,7 +26,16 @@ export const useCredits = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCredits(data || []);
+      
+      // Cast the data to proper types
+      const typedCredits = (data || []).map(credit => ({
+        ...credit,
+        items: Array.isArray(credit.items) ? credit.items : 
+               typeof credit.items === 'string' ? JSON.parse(credit.items) : [],
+        is_paid: credit.is_paid || false
+      }));
+      
+      setCredits(typedCredits);
     } catch (error) {
       console.error('Error fetching credits:', error);
       toast({
@@ -39,7 +48,7 @@ export const useCredits = () => {
     }
   };
 
-  const addCredit = async (customerName: string, items: any, totalAmount: number) => {
+  const addCredit = async (customerName: string, items: any[], totalAmount: number) => {
     try {
       // First, deduct stock for products in the cart
       for (const item of items) {
@@ -111,7 +120,10 @@ export const useCredits = () => {
       if (error) throw error;
 
       // Now record sales for each item to add to profit
-      for (const item of credit.items) {
+      const itemsArray = Array.isArray(credit.items) ? credit.items :
+                        typeof credit.items === 'string' ? JSON.parse(credit.items) : [];
+      
+      for (const item of itemsArray) {
         if (item.type === 'paninda') {
           // Insert sale record for the product
           const { error: saleError } = await supabase

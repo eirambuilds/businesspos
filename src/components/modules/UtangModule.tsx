@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ import { FileText, Plus, User, CheckCircle, AlertCircle, ShoppingCart, Smartphon
 import { useToast } from '@/hooks/use-toast';
 import { useCredits } from '@/hooks/useCredits';
 import { useProducts } from '@/hooks/useProducts';
+import { useCustomers } from '@/hooks/useCustomers';
 
 interface UtangModuleProps {
   onClose: () => void;
@@ -22,49 +22,46 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
   const { toast } = useToast();
   const { credits, addCredit, markAsPaid, getTotalUnpaid, fetchCredits } = useCredits();
   const { products } = useProducts();
+  const { customers } = useCustomers();
   const [activeTab, setActiveTab] = useState('view');
   const [showAddUtang, setShowAddUtang] = useState(false);
-  const [showAddCustomer, setShowAddCustomer] = useState(false);
   
-  // Mock customers for now
-  const [customers, setCustomers] = useState([
-    { id: '1', name: 'Maria Santos' },
-    { id: '2', name: 'Juan dela Cruz' },
-    { id: '3', name: 'Ana Reyes' }
-  ]);
-
-  const [newCustomer, setNewCustomer] = useState('');
   const [newUtang, setNewUtang] = useState({
-    customerId: '',
     customerName: '',
-    type: '', // 'paninda', 'load', 'gcash', 'bills'
+    type: '',
     items: [] as any[],
     totalAmount: 0
   });
 
   // Cart for different types of utang
   const [cart, setCart] = useState<any[]>([]);
+  
+  // Autocomplete states
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchCredits();
   }, []);
 
-  const addCustomer = () => {
-    if (!newCustomer.trim()) return;
+  // Handle customer name input with autocomplete
+  const handleCustomerNameChange = (value: string) => {
+    setNewUtang(prev => ({ ...prev, customerName: value }));
     
-    const customer = {
-      id: Date.now().toString(),
-      name: newCustomer
-    };
-    
-    setCustomers(prev => [...prev, customer]);
-    setNewCustomer('');
-    setShowAddCustomer(false);
-    
-    toast({
-      title: "Customer nadagdag!",
-      description: `${customer.name} ay naidagdag na sa lista.`,
-    });
+    if (value.length > 0) {
+      const filtered = customers.filter(customer =>
+        customer.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectCustomer = (customerName: string) => {
+    setNewUtang(prev => ({ ...prev, customerName }));
+    setShowSuggestions(false);
   };
 
   const addToCart = (item: any, type: string) => {
@@ -103,23 +100,20 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
   };
 
   const handleAddUtang = async () => {
-    if (!newUtang.customerId || cart.length === 0) {
+    if (!newUtang.customerName || cart.length === 0) {
       toast({
         title: "Kulang ang datos!",
-        description: "Piliin ang customer at magdagdag ng items sa cart.",
+        description: "I-type ang customer name at magdagdag ng items sa cart.",
         variant: "destructive"
       });
       return;
     }
 
-    const customer = customers.find(c => c.id === newUtang.customerId);
-    if (!customer) return;
-
     const totalAmount = calculateCartTotal();
     
-    const result = await addCredit(customer.name, cart, totalAmount);
+    const result = await addCredit(newUtang.customerName, cart, totalAmount);
     if (result.success) {
-      setNewUtang({ customerId: '', customerName: '', type: '', items: [], totalAmount: 0 });
+      setNewUtang({ customerName: '', type: '', items: [], totalAmount: 0 });
       setCart([]);
       setShowAddUtang(false);
       setActiveTab('view');
@@ -129,7 +123,6 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
   const handleMarkAsPaid = async (creditId: string) => {
     const result = await markAsPaid(creditId);
     if (result.success) {
-      // Refresh the credits data
       fetchCredits();
     }
   };
@@ -206,19 +199,10 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
         <TabsContent value="view" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Mga Customer na May Utang</h3>
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAddCustomer(true)}
-              >
-                <User className="h-4 w-4 mr-2" />
-                Add Customer
-              </Button>
-              <Button onClick={() => setShowAddUtang(true)} className="bg-blue-500 hover:bg-blue-600">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Utang
-              </Button>
-            </div>
+            <Button onClick={() => setShowAddUtang(true)} className="bg-blue-500 hover:bg-blue-600">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Utang
+            </Button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -312,37 +296,6 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
         </TabsContent>
       </Tabs>
 
-      {/* Add Customer Dialog */}
-      <Dialog open={showAddCustomer} onOpenChange={setShowAddCustomer}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Magdagdag ng Customer</DialogTitle>
-            <DialogDescription>
-              Pangalan ng bagong customer
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="customer-name">Pangalan</Label>
-              <Input
-                id="customer-name"
-                value={newCustomer}
-                onChange={(e) => setNewCustomer(e.target.value)}
-                placeholder="e.g. Maria Santos"
-              />
-            </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowAddCustomer(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={addCustomer} className="flex-1 bg-blue-500 hover:bg-blue-600">
-                Idagdag
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Add Utang Dialog */}
       <Dialog open={showAddUtang} onOpenChange={setShowAddUtang}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -353,30 +306,31 @@ export const UtangModule = ({ onClose }: UtangModuleProps) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="customer-select">Customer</Label>
-              <Select 
-                value={newUtang.customerId} 
-                onValueChange={(value) => {
-                  const customer = customers.find(c => c.id === value);
-                  setNewUtang(prev => ({ 
-                    ...prev, 
-                    customerId: value,
-                    customerName: customer?.name || ''
-                  }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Piliin ang customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
+            <div className="relative">
+              <Label htmlFor="customer-name">Customer Name</Label>
+              <Input
+                id="customer-name"
+                value={newUtang.customerName}
+                onChange={(e) => handleCustomerNameChange(e.target.value)}
+                placeholder="I-type ang pangalan ng customer..."
+                onFocus={() => newUtang.customerName && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              />
+              
+              {/* Autocomplete Suggestions */}
+              {showSuggestions && filteredCustomers.length > 0 && (
+                <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+                  {filteredCustomers.map((customer) => (
+                    <button
+                      key={customer.id}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                      onClick={() => selectCustomer(customer.name)}
+                    >
                       {customer.name}
-                    </SelectItem>
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
 
             <Tabs value={newUtang.type} onValueChange={(value) => setNewUtang(prev => ({ ...prev, type: value }))}>

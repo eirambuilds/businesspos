@@ -21,8 +21,8 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
   const [amount, setAmount] = useState(0);
   const [showOtherAmount, setShowOtherAmount] = useState(false);
 
-  const networks = ['Globe', 'Smart', 'Sun', 'TM', 'TNT'];
-  const commonAmounts = [15, 20, 25, 30, 50, 100, 150, 200, 300, 500];
+  const networks = ['Globe', 'Smart', 'Sun', 'TM', 'TNT', 'Dito', 'Other'];
+  const commonAmounts = [10, 15, 20, 30, 50, 100, 150, 200, 300, 500];
 
   const calculateKita = (loadAmount: number) => {
     if (loadAmount >= 5 && loadAmount <= 90) return 3;

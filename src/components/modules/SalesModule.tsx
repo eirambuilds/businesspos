@@ -174,7 +174,7 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto">
             {filteredProducts.map((product) => {
               const cartItem = cart.find(item => item.id === product.id);
               const availableStock = product.stock - (cartItem?.quantity || 0);

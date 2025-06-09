@@ -1,370 +1,244 @@
-
-import { useState, useEffect } from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { useProducts } from '@/hooks/useProducts';
-import { useSales } from '@/hooks/useSales';
-import { useGcash } from '@/hooks/useGcash';
-import { useLoad } from '@/hooks/useLoad';
-import { useBills } from '@/hooks/useBills';
-import { useCredits } from '@/hooks/useCredits';
-import { useExpenses } from '@/hooks/useExpenses';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Package, ShoppingCart, Users, CreditCard, FileText, DollarSign, TrendingUp, AlertTriangle, Calendar, Activity, Banknote, UserCheck, ListTodo, Download } from 'lucide-react';
 import { InventoryModule } from '@/components/modules/InventoryModule';
 import { SalesModule } from '@/components/modules/SalesModule';
-import { UtangModule } from '@/components/modules/UtangModule';
-import { KitaModule } from '@/components/modules/KitaModule';
-import { GastosModule } from '@/components/modules/GastosModule';
-import { GroceryListModule } from '@/components/modules/GroceryListModule';
 import { LoadQuickModule } from '@/components/modules/LoadQuickModule';
 import { GcashQuickModule } from '@/components/modules/GcashQuickModule';
 import { BillsQuickModule } from '@/components/modules/BillsQuickModule';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Package, ShoppingCart, FileText, TrendingUp, Wallet, LogOut, ListTodo, Smartphone, CreditCard, Receipt, DollarSign } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { EnhancedGroceryListModule } from '@/components/modules/EnhancedGroceryListModule';
+import { SimpleGroceryListModule } from '@/components/modules/SimpleGroceryListModule';
+import { GastosModule } from '@/components/modules/GastosModule';
+import { KitaModule } from '@/components/modules/KitaModule';
+import { UtangModule } from '@/components/modules/UtangModule';
+import { InventorySnapshotModule } from '@/components/modules/InventorySnapshotModule';
+import { ActivityLogModule } from '@/components/modules/ActivityLogModule';
+import { LiabilitiesModule } from '@/components/modules/LiabilitiesModule';
+import { CustomerProfilesModule } from '@/components/modules/CustomerProfilesModule';
 
 const Index = () => {
-  const isMobile = useIsMobile();
-  const { toast } = useToast();
-  const { user, signOut } = useAuth();
-  const { products } = useProducts();
-  const { sales, getTodaysSales } = useSales();
-  const { getTodaysKita: getGcashKita } = useGcash();
-  const { getTodaysKita: getLoadKita } = useLoad();
-  const { getTodaysKita: getBillsKita } = useBills();
-  const { getTotalUnpaid } = useCredits();
-  const { getTodaysTotal: getTodaysExpenses, getMonthlyTotal: getMonthlyExpenses } = useExpenses();
   const [activeModule, setActiveModule] = useState<string | null>(null);
-  const [todaysProductKita, setTodaysProductKita] = useState(0);
 
-  // Calculate today's product profit from actual sales
-  useEffect(() => {
-    const calculateTodaysProductKita = async () => {
-      try {
-        const today = new Date().toDateString();
-        
-        // Get today's sales
-        const { data: todaysSales, error } = await supabase
-          .from('sales')
-          .select(`
-            *,
-            products!inner(tubo)
-          `)
-          .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-          .lt('created_at', new Date(new Date().setHours(23, 59, 59, 999)).toISOString());
-
-        if (error) {
-          console.error('Error fetching today\'s sales:', error);
-          return;
-        }
-
-        // Calculate total profit
-        const totalKita = (todaysSales || []).reduce((sum, sale) => {
-          const productTubo = sale.products?.tubo || 0;
-          return sum + (productTubo * sale.quantity);
-        }, 0);
-
-        setTodaysProductKita(totalKita);
-      } catch (error) {
-        console.error('Error calculating product kita:', error);
-      }
-    };
-
-    calculateTodaysProductKita();
-  }, [sales]);
-
-  // Calculate dashboard data dynamically
-  const lowStockItems = products.filter(p => p.stock < 10).length;
-  const todaysSales = getTodaysSales();
-  
-  // Total kita from all sources
-  const gcashKita = getGcashKita();
-  const loadKita = getLoadKita();
-  const billsKita = getBillsKita();
-  const totalKitaToday = todaysProductKita + gcashKita + loadKita + billsKita;
-  const totalUnpaidCredits = getTotalUnpaid();
-  const todaysExpenses = getTodaysExpenses();
-  const monthlyExpenses = getMonthlyExpenses();
-
-  const handleSignOut = async () => {
-    await signOut();
-    toast({
-      title: "Na-logout na!",
-      description: "Salamat sa paggamit ng sistema."
-    });
+  const openModule = (module: string) => {
+    setActiveModule(module);
   };
 
-  const quickActions = [
-    {
-      title: 'Benta',
-      description: 'I-record ang sales',
-      icon: ShoppingCart,
-      color: 'bg-green-500 hover:bg-green-600',
-      module: 'sales'
-    },
-    {
-      title: 'Load Quick',
-      description: 'Mag-load ng mobile',
-      icon: Smartphone,
-      color: 'bg-emerald-500 hover:bg-emerald-600',
-      module: 'load-quick'
-    },
-    {
-      title: 'GCash Quick',
-      description: 'GCash transactions',
-      icon: CreditCard,
-      color: 'bg-blue-600 hover:bg-blue-700',
-      module: 'gcash-quick'
-    },
-    {
-      title: 'Bills Payment',
-      description: 'Bayad bills',
-      icon: Receipt,
-      color: 'bg-orange-500 hover:bg-orange-600',
-      module: 'bills-quick'
-    },
-    {
-      title: 'Utang',
-      description: 'Customer credits',
-      icon: FileText,
-      color: 'bg-yellow-500 hover:bg-yellow-600',
-      module: 'utang'
-    },
-    {
-      title: 'Kita',
-      description: 'Tingnan ang profit',
-      icon: TrendingUp,
-      color: 'bg-purple-500 hover:bg-purple-600',
-      module: 'kita'
-    },
-    {
-      title: 'Gastos',
-      description: 'I-track ang expenses',
-      icon: Wallet,
-      color: 'bg-red-500 hover:bg-red-600',
-      module: 'gastos'
-    },
-    {
-      title: 'Grocery List',
-      description: 'Generate restock list',
-      icon: ListTodo,
-      color: 'bg-indigo-500 hover:bg-indigo-600',
-      module: 'grocery'
-    },
-    {
-      title: 'Magdagdag ng Paninda',
-      description: 'I-manage ang inventory',
-      icon: Package,
-      color: 'bg-blue-500 hover:bg-blue-600',
-      module: 'inventory'
-    },
-  ];
+  const closeModule = () => {
+    setActiveModule(null);
+  };
 
   const renderModule = () => {
     switch (activeModule) {
-      case 'inventory':
-        return <InventoryModule onClose={() => setActiveModule(null)} />;
-      case 'sales':
-        return <SalesModule onClose={() => setActiveModule(null)} />;
-      case 'load-quick':
-        return <LoadQuickModule onClose={() => setActiveModule(null)} />;
-      case 'gcash-quick':
-        return <GcashQuickModule onClose={() => setActiveModule(null)} />;
-      case 'bills-quick':
-        return <BillsQuickModule onClose={() => setActiveModule(null)} />;
-      case 'utang':
-        return <UtangModule onClose={() => setActiveModule(null)} />;
-      case 'kita':
-        return <KitaModule onClose={() => setActiveModule(null)} />;
-      case 'gastos':
-        return <GastosModule onClose={() => setActiveModule(null)} />;
-      case 'grocery':
-        return <GroceryListModule onClose={() => setActiveModule(null)} />;
-      default:
-        return null;
+      case 'inventory': return <InventoryModule onClose={closeModule} />;
+      case 'sales': return <SalesModule onClose={closeModule} />;
+      case 'load': return <LoadQuickModule onClose={closeModule} />;
+      case 'gcash': return <GcashQuickModule onClose={closeModule} />;
+      case 'bills': return <BillsQuickModule onClose={closeModule} />;
+      case 'enhanced-grocery': return <EnhancedGroceryListModule onClose={closeModule} />;
+      case 'simple-grocery': return <SimpleGroceryListModule onClose={closeModule} />;
+      case 'gastos': return <GastosModule onClose={closeModule} />;
+      case 'kita': return <KitaModule onClose={closeModule} />;
+      case 'utang': return <UtangModule onClose={closeModule} />;
+      case 'inventory-snapshot': return <InventorySnapshotModule onClose={closeModule} />;
+      case 'activity-log': return <ActivityLogModule onClose={closeModule} />;
+      case 'liabilities': return <LiabilitiesModule onClose={closeModule} />;
+      case 'customer-profiles': return <CustomerProfilesModule onClose={closeModule} />;
+      default: return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-primary">POS System</h1>
-              <p className="text-sm text-muted-foreground">
-                Kumusta, {user?.email?.split('@')[0]}!
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSignOut}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Dashboard Cards */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Sales Ngayon</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">₱{todaysSales.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Araw na ito</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Gastos Ngayon</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">₱{todaysExpenses.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Buwan: ₱{monthlyExpenses.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Utang Hindi pa Bayad</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">₱{totalUnpaidCredits.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total credits</p>
-            </CardContent>
-          </Card>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            POS System
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Ang iyong all-in-one na solusyon para sa pamamahala ng benta, customer, at pananalapi.
+          </p>
         </div>
 
-        {/* Kita Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kita sa Products</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">₱{todaysProductKita.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Paninda ngayon</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kita sa Load</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">₱{loadKita.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Load ngayon</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kita sa GCash</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">₱{gcashKita.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">GCash ngayon</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kita sa Bills</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">₱{billsKita.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Bills ngayon</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Kulang na Stock</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{lowStockItems}</div>
-              <p className="text-xs text-muted-foreground">Produkto na maubos na</p>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Produkto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{products.length}</div>
-              <p className="text-xs text-muted-foreground">Sa inventory</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Mabilis na Aksyon</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickActions.map((action, index) => (
-              <Card 
-                key={index} 
-                className="cursor-pointer transition-all hover:shadow-lg hover:scale-105"
-                onClick={() => setActiveModule(action.module)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-3 rounded-lg ${action.color} text-white`}>
-                      <action.icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{action.title}</h3>
-                      <p className="text-sm text-muted-foreground">{action.description}</p>
-                    </div>
+        <div className="space-y-8">
+          {/* Core Sales and Transactions */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Core Sales and Transactions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('sales')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <ShoppingCart className="h-6 w-6 text-blue-500" />
+                    <CardTitle>Add to Cart</CardTitle>
                   </div>
-                </CardContent>
+                  <CardDescription>Mag-record ng mga benta</CardDescription>
+                </CardHeader>
               </Card>
-            ))}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('load')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <CreditCard className="h-6 w-6 text-purple-500" />
+                    <CardTitle>Load</CardTitle>
+                  </div>
+                  <CardDescription>Mobile load transactions</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('gcash')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Banknote className="h-6 w-6 text-blue-600" />
+                    <CardTitle>GCash</CardTitle>
+                  </div>
+                  <CardDescription>GCash cash-in/out services</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('bills')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-6 w-6 text-orange-500" />
+                    <CardTitle>Bills</CardTitle>
+                  </div>
+                  <CardDescription>Utility bills payment</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* Customer Management */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Customer Management</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('utang')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-6 w-6 text-red-500" />
+                    <CardTitle>Customer (Utang)</CardTitle>
+                  </div>
+                  <CardDescription>I-track ang mga utang</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('customer-profiles')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <UserCheck className="h-6 w-6 text-indigo-500" />
+                    <CardTitle>Customer Profiles</CardTitle>
+                  </div>
+                  <CardDescription>Customer info at history</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* Financial Tracking */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Financial Tracking</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('kita')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="h-6 w-6 text-green-600" />
+                    <CardTitle>Kita</CardTitle>
+                  </div>
+                  <CardDescription>I-track ang mga kita</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('gastos')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-6 w-6 text-red-600" />
+                    <CardTitle>Gastos</CardTitle>
+                  </div>
+                  <CardDescription>I-record ang mga gastos</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('liabilities')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-6 w-6 text-yellow-500" />
+                    <CardTitle>Liabilities</CardTitle>
+                  </div>
+                  <CardDescription>Mga utang at obligations</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* Inventory Management */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Inventory Management</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('inventory')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Package className="h-6 w-6 text-green-500" />
+                    <CardTitle>Inventory</CardTitle>
+                  </div>
+                  <CardDescription>I-manage ang mga produkto</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('inventory-snapshot')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-6 w-6 text-blue-700" />
+                    <CardTitle>End Inventory</CardTitle>
+                  </div>
+                  <CardDescription>Monthly inventory snapshots</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* Grocery List Management */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Grocery List Management</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('simple-grocery')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Download className="h-6 w-6 text-gray-500" />
+                    <CardTitle>Simple Grocery List</CardTitle>
+                  </div>
+                  <CardDescription>Clean printable list</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('enhanced-grocery')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-6 w-6 text-emerald-500" />
+                    <CardTitle>Enhanced Grocery List</CardTitle>
+                  </div>
+                  <CardDescription>With cost estimates</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+
+          {/* System Management and Audit */}
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">System Management and Audit</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openModule('activity-log')}>
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <Activity className="h-6 w-6 text-gray-600" />
+                    <CardTitle>Full System Activity Log</CardTitle>
+                  </div>
+                  <CardDescription>Complete audit trail</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Low Stock Alert */}
-        {lowStockItems > 0 && (
-          <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-            <CardHeader>
-              <CardTitle className="text-yellow-700 dark:text-yellow-300">
-                Babala: May kulang na stock!
-              </CardTitle>
-              <CardDescription className="text-yellow-600 dark:text-yellow-400">
-                May {lowStockItems} na produkto na maubos na. I-check ang inventory.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
-      </main>
-
-      {/* Module Dialogs */}
-      {activeModule && (
-        <Dialog open={!!activeModule} onOpenChange={() => setActiveModule(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!activeModule} onOpenChange={closeModule}>
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0">
+          <div className="p-6">
             {renderModule()}
-          </DialogContent>
-        </Dialog>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

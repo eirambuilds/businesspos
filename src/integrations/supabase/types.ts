@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action_type: string
+          affected_data: Json | null
+          created_at: string
+          description: string
+          id: string
+          user_email: string
+        }
+        Insert: {
+          action_type: string
+          affected_data?: Json | null
+          created_at?: string
+          description: string
+          id?: string
+          user_email: string
+        }
+        Update: {
+          action_type?: string
+          affected_data?: Json | null
+          created_at?: string
+          description?: string
+          id?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       bills_payments: {
         Row: {
           amount: number
@@ -63,6 +90,33 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -108,6 +162,63 @@ export type Database = {
           id?: string
           kita?: number
           transaction_type?: string
+        }
+        Relationships: []
+      }
+      inventory_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          snapshot_date: string
+          total_items: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items?: Json
+          snapshot_date: string
+          total_items?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          snapshot_date?: string
+          total_items?: number
+        }
+        Relationships: []
+      }
+      liabilities: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          due_date: string | null
+          id: string
+          person_involved: string
+          status: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          due_date?: string | null
+          id?: string
+          person_involved: string
+          status?: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          due_date?: string | null
+          id?: string
+          person_involved?: string
+          status?: string
+          type?: string
         }
         Relationships: []
       }
