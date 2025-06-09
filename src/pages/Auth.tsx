@@ -73,7 +73,7 @@ const Auth = () => {
                 <Input
                   id="login-email"
                   type="email"
-                  placeholder="admin@tindahan.com"
+                  placeholder="admin@example.com"
                   value={loginData.email}
                   onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                   className="pl-10"
