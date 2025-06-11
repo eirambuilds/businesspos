@@ -1,4 +1,4 @@
-# Welcome to POS and Inventory System
+# Welcome to Business POS System
 
 ## Technologies Used
 
