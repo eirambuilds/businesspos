@@ -19,15 +19,26 @@ export const useActivityLog = () => {
 
   const fetchLogs = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('activity_logs')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching logs:', error);
+        throw error;
+      }
+      
+      console.log('Fetched activity logs:', data);
       setLogs(data || []);
     } catch (error) {
       console.error('Error fetching activity logs:', error);
+      toast({
+        title: "Error loading activity logs",
+        description: "Could not load activity logs.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -35,18 +46,29 @@ export const useActivityLog = () => {
 
   const logActivity = async (actionType: string, description: string, affectedData?: any) => {
     try {
+      console.log('Logging activity:', { actionType, description, affectedData });
+      
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('activity_logs')
         .insert([{
           action_type: actionType,
           description: description,
           user_email: user?.email || 'Unknown',
           affected_data: affectedData || {}
-        }]);
+        }])
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting activity log:', error);
+        throw error;
+      }
+
+      console.log('Activity logged successfully:', data);
+      
+      // Refresh logs after adding new one
+      fetchLogs();
     } catch (error) {
       console.error('Error logging activity:', error);
     }

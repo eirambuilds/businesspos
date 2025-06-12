@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +53,13 @@ export const EnhancedGroceryListModule = ({ onClose }: EnhancedGroceryListModule
       description: `${list.length} items with cost estimates.`
     });
   };
+
+  // Automatically generate list when products are loaded
+  useEffect(() => {
+    if (!loading && products.length > 0) {
+      generateGroceryList();
+    }
+  }, [loading, products]);
 
   const updateQuantity = (productId: string, change: number) => {
     setGroceryList(prev => prev.map(item => {
@@ -133,8 +139,6 @@ export const EnhancedGroceryListModule = ({ onClose }: EnhancedGroceryListModule
     );
   }
 
-  const lowStockCount = products.filter(p => p.stock < 10).length;
-
   return (
     <div className="space-y-6">
       <DialogHeader>
@@ -144,153 +148,104 @@ export const EnhancedGroceryListModule = ({ onClose }: EnhancedGroceryListModule
         </DialogDescription>
       </DialogHeader>
 
-      {!isGenerated ? (
-        <div className="text-center py-8">
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <div className="mx-auto p-3 bg-indigo-500 text-white rounded-full w-fit mb-4">
-                <ListTodo className="h-8 w-8" />
-              </div>
-              <CardTitle>Generate Smart Grocery List</CardTitle>
-              <CardDescription>
-                May {lowStockCount} na produkto na kulang na stock
-              </CardDescription>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Smart Restock List ({groceryList.length} items)</h3>
+          <div className="flex space-x-2">
+            <Button 
+              onClick={generateDetailedPDF}
+              className="bg-green-500 hover:bg-green-600"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Download Detailed List
+            </Button>
+          </div>
+        </div>
+
+        {/* Cost Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-blue-50 dark:bg-blue-950">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Total Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button 
-                onClick={generateGroceryList}
-                className="w-full bg-indigo-500 hover:bg-indigo-600"
-                disabled={lowStockCount === 0}
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Generate with Cost Estimates
-              </Button>
-              {lowStockCount === 0 && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Walang produktong kulang na stock ngayon!
-                </p>
-              )}
+              <div className="text-2xl font-bold text-blue-600">
+                {totalItems}
+              </div>
+              <p className="text-xs text-muted-foreground">pieces</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-green-50 dark:bg-green-950">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Estimated Budget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                ₱{totalEstimatedCost.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">total cost</p>
             </CardContent>
           </Card>
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Smart Restock List ({groceryList.length} items)</h3>
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline"
-                onClick={() => setIsGenerated(false)}
-              >
-                Generate New List
-              </Button>
-              <Button 
-                onClick={generateDetailedPDF}
-                className="bg-green-500 hover:bg-green-600"
-              >
-                <FileDown className="h-4 w-4 mr-2" />
-                Download Detailed List
-              </Button>
-            </div>
-          </div>
 
-          {/* Cost Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-blue-50 dark:bg-blue-950">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Total Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {totalItems}
-                </div>
-                <p className="text-xs text-muted-foreground">pieces</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-green-50 dark:bg-green-950">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Estimated Budget</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  ₱{totalEstimatedCost.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">total cost</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-purple-50 dark:bg-purple-950">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Average per Item</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  ₱{groceryList.length > 0 ? (totalEstimatedCost / groceryList.length).toFixed(0) : '0'}
-                </div>
-                <p className="text-xs text-muted-foreground">per product</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {groceryList.map((item) => (
-              <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm">{item.product_name}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Current stock: {item.current_stock} pcs
-                      </p>
-                      <p className="text-xs text-blue-600">
-                        Suggested: {item.suggested_quantity} pcs @ ₱{item.estimated_cost_per_unit.toFixed(2)} each
-                      </p>
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {groceryList.map((item) => (
+            <Card key={item.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm">{item.product_name}</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Current stock: {item.current_stock} pcs
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Suggested: {item.suggested_quantity} pcs @ ₱{item.estimated_cost_per_unit.toFixed(2)} each
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => updateQuantity(item.id, -1)}
+                        className="h-6 w-6 p-0"
+                        disabled={item.final_quantity <= 0}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={item.final_quantity}
+                        onChange={(e) => updateQuantityDirect(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-16 h-6 text-center text-xs"
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => updateQuantity(item.id, 1)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
                     </div>
                     
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => updateQuantity(item.id, -1)}
-                          className="h-6 w-6 p-0"
-                          disabled={item.final_quantity <= 0}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          value={item.final_quantity}
-                          onChange={(e) => updateQuantityDirect(item.id, Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-16 h-6 text-center text-xs"
-                        />
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => updateQuantity(item.id, 1)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      
-                      <div className="text-right">
-                        <p className="font-semibold text-sm">
-                          ₱{item.total_estimated_cost.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.final_quantity} pcs
-                        </p>
-                      </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm">
+                        ₱{item.total_estimated_cost.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.final_quantity} pcs
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };

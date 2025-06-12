@@ -1,12 +1,13 @@
-
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { useSales, CartItem } from '@/hooks/useSales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingCart, Plus, Minus, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,6 +21,8 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
   const { processSale } = useSales();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const addToCart = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -108,6 +111,10 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
     return cart.reduce((total, item) => total + item.subtotal, 0);
   };
 
+  const getTotalProfit = () => {
+    return cart.reduce((total, item) => total + (item.tubo * item.quantity), 0);
+  };
+
   const handleProcessSale = async () => {
     if (cart.length === 0) {
       toast({
@@ -118,9 +125,11 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
       return;
     }
 
-    const result = await processSale(cart);
+    const result = await processSale(cart, paymentMethod);
     if (result.success) {
       setCart([]);
+      setCustomerName('');
+      setPaymentMethod('cash');
     }
   };
 
@@ -174,7 +183,7 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-65 overflow-y-auto">
             {filteredProducts.map((product) => {
               const cartItem = cart.find(item => item.id === product.id);
               const availableStock = product.stock - (cartItem?.quantity || 0);
@@ -272,10 +281,40 @@ export const SalesModule = ({ onClose }: SalesModuleProps) => {
                     </div>
                   ))}
                   
+                  {/* Customer and Payment Info */}
+                  <div className="border-t pt-3 space-y-3">
+                    <div>
+                      <Label htmlFor="customer-name">Customer Name (Optional)</Label>
+                      <Input
+                        id="customer-name"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="I-type ang pangalan (optional)"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="payment-method">Payment Method</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="gcash">GCash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
                   <div className="border-t pt-3 mt-4">
-                    <div className="flex justify-between items-center text-lg font-bold">
+                    <div className="flex justify-between items-center text-lg font-bold mb-2">
                       <span>Total:</span>
                       <span className="text-green-600">₱{getTotalAmount().toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-blue-600">
+                      <span>Kita (Profit):</span>
+                      <span className="font-semibold">₱{getTotalProfit().toLocaleString()}</span>
                     </div>
                   </div>
                   

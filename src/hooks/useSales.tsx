@@ -101,6 +101,30 @@ export const useSales = () => {
       .reduce((sum, sale) => sum + sale.total_amount, 0);
   };
 
+  const getWeeklySales = () => {
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return sales
+      .filter(sale => new Date(sale.created_at) >= weekStart)
+      .reduce((sum, sale) => sum + sale.total_amount, 0);
+  };
+
+  const getMonthlySales = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return sales
+      .filter(sale => new Date(sale.created_at) >= monthStart)
+      .reduce((sum, sale) => sum + sale.total_amount, 0);
+  };
+
+  const getYearlySales = () => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    return sales
+      .filter(sale => new Date(sale.created_at) >= yearStart)
+      .reduce((sum, sale) => sum + sale.total_amount, 0);
+  };
+
   useEffect(() => {
     fetchSales();
   }, []);
@@ -110,6 +134,9 @@ export const useSales = () => {
     loading,
     fetchSales,
     processSale,
-    getTodaysSales
+    getTodaysSales,
+    getWeeklySales,
+    getMonthlySales,
+    getYearlySales
   };
 };

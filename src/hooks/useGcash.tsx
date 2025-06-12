@@ -85,6 +85,37 @@ export const useGcash = () => {
       .reduce((sum, transaction) => sum + transaction.kita, 0);
   };
 
+  const getWeeklyKita = () => {
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return transactions
+      .filter(transaction => new Date(transaction.created_at) >= weekStart)
+      .reduce((sum, transaction) => sum + transaction.kita, 0);
+  };
+
+  const getMonthlyKita = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return transactions
+      .filter(transaction => new Date(transaction.created_at) >= monthStart)
+      .reduce((sum, transaction) => sum + transaction.kita, 0);
+  };
+
+  const getYearlyKita = () => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    return transactions
+      .filter(transaction => new Date(transaction.created_at) >= yearStart)
+      .reduce((sum, transaction) => sum + transaction.kita, 0);
+  };
+
+  const getTodaysGcashSales = () => {
+    const today = new Date().toDateString();
+    return transactions
+      .filter(transaction => new Date(transaction.created_at).toDateString() === today)
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+  };
+
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -94,6 +125,10 @@ export const useGcash = () => {
     loading,
     addTransaction,
     getTodaysKita,
+    getWeeklyKita,
+    getMonthlyKita,
+    getYearlyKita,
+    getTodaysGcashSales,
     fetchTransactions
   };
 };

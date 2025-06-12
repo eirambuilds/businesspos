@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useActivityLog } from '@/hooks/useActivityLog';
 
 export interface Expense {
   id: string;
@@ -15,6 +16,7 @@ export const useExpenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { logActivity } = useActivityLog();
 
   const fetchExpenses = async () => {
     try {
@@ -49,6 +51,13 @@ export const useExpenses = () => {
 
       if (error) throw error;
       
+      // Log the activity
+      await logActivity(
+        'EXPENSE_CREATE',
+        `Added expense: ₱${amount} for ${category}`,
+        { category, amount, description }
+      );
+      
       toast({
         title: "Gastos naitala!",
         description: `₱${amount} para sa ${category} ay naitala na.`
@@ -61,6 +70,49 @@ export const useExpenses = () => {
       toast({
         title: "Error sa gastos",
         description: "Hindi ma-record ang gastos.",
+        variant: "destructive"
+      });
+      return { success: false };
+    }
+  };
+
+  const deleteExpense = async (expenseId: string) => {
+    try {
+      // Get expense details before deleting for logging
+      const { data: expenseToDelete } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('id', expenseId)
+        .single();
+
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId);
+
+      if (error) throw error;
+      
+      // Log the activity
+      if (expenseToDelete) {
+        await logActivity(
+          'EXPENSE_DELETE',
+          `Deleted expense: ₱${expenseToDelete.amount} for ${expenseToDelete.category}`,
+          expenseToDelete
+        );
+      }
+      
+      toast({
+        title: "Gastos na-delete!",
+        description: "Na-delete na ang gastos record."
+      });
+      
+      fetchExpenses();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast({
+        title: "Error sa pag-delete",
+        description: "Hindi ma-delete ang gastos record.",
         variant: "destructive"
       });
       return { success: false };
@@ -89,6 +141,7 @@ export const useExpenses = () => {
     expenses,
     loading,
     addExpense,
+    deleteExpense,
     getTodaysTotal,
     getMonthlyTotal,
     fetchExpenses

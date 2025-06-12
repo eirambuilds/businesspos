@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +67,63 @@ export const useProducts = () => {
     }
   };
 
+  const updateProduct = async (productId: string, productData: Partial<Product>) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          ...productData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Produkto na-update!",
+        description: "Na-update na ang product details."
+      });
+      
+      fetchProducts();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast({
+        title: "Error sa pag-update",
+        description: "Hindi ma-update ang produkto.",
+        variant: "destructive"
+      });
+      return { success: false };
+    }
+  };
+
+  const deleteProduct = async (productId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Produkto na-delete!",
+        description: "Na-delete na ang produkto."
+      });
+      
+      fetchProducts();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Error sa pag-delete",
+        description: "Hindi ma-delete ang produkto.",
+        variant: "destructive"
+      });
+      return { success: false };
+    }
+  };
+
   const updateStock = async (productId: string, newStock: number) => {
     try {
       const { error } = await supabase
@@ -105,6 +161,8 @@ export const useProducts = () => {
     loading,
     fetchProducts,
     addProduct,
+    updateProduct,
+    deleteProduct,
     updateStock
   };
 };

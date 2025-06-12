@@ -21,20 +21,13 @@ export const GcashQuickModule = ({ onClose }: GcashQuickModuleProps) => {
   const [amount, setAmount] = useState(0);
   const [showOtherAmount, setShowOtherAmount] = useState(false);
 
-  const transactionTypes = ['Cash In', 'Payment', 'Transfer'];
+  const transactionTypes = ['Cash In', 'Cash Out', 'Payment'];
   const commonAmounts = [100, 200, 300, 500, 1000, 1500, 2000, 2500, 3000, 5000];
 
-  const calculateKita = (gcashAmount: number) => {
-    if (gcashAmount >= 5 && gcashAmount <= 500) return 10;
-    if (gcashAmount >= 501 && gcashAmount <= 1000) return 20;
-    if (gcashAmount >= 1001 && gcashAmount <= 1500) return 30;
-    if (gcashAmount >= 1501 && gcashAmount <= 2000) return 40;
-    if (gcashAmount >= 2001 && gcashAmount <= 2500) return 50;
-    
-    // For amounts above 2500, add 10 pesos for every 500 increment
-    const excess = gcashAmount - 2500;
-    const additionalKita = Math.floor(excess / 500) * 10;
-    return 50 + additionalKita;
+  const calculateKita = (gcashAmount: number): number => {
+    if (gcashAmount < 5) return 0;
+    const tier = Math.min(Math.ceil(Math.max(gcashAmount, 500) / 500), 5);
+    return gcashAmount <= 2500 ? tier * 10 : 50 + Math.floor((gcashAmount - 2500) / 500) * 10;
   };
 
   const handleAmountChange = (value: number) => {

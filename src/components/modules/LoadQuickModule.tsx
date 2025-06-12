@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Smartphone, Plus, Minus } from 'lucide-react';
@@ -19,16 +19,13 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
   const { toast } = useToast();
   const [network, setNetwork] = useState('');
   const [amount, setAmount] = useState(0);
+  const [customerName, setCustomerName] = useState('');
   const [showOtherAmount, setShowOtherAmount] = useState(false);
 
   const networks = ['Globe', 'Smart', 'Sun', 'TM', 'TNT', 'Dito', 'Other'];
   const commonAmounts = [10, 15, 20, 30, 50, 100, 150, 200, 300, 500];
 
-  const calculateKita = (loadAmount: number) => {
-    if (loadAmount >= 5 && loadAmount <= 90) return 3;
-    if (loadAmount >= 91 && loadAmount <= 190) return 5;
-    return 10;
-  };
+  const calculateKita = (loadAmount: number): number => loadAmount < 5 ? 0 : loadAmount <= 90 ? 3 : loadAmount <= 190 ? 5 : 10 + Math.floor((loadAmount - 191) / 50) * 5;
 
   const handleAmountChange = (value: number) => {
     setAmount(value);
@@ -36,7 +33,6 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
 
   const adjustAmount = (increment: number) => {
     const newAmount = Math.max(5, amount + increment);
-    // Ensure amount is divisible by 5
     const roundedAmount = Math.round(newAmount / 5) * 5;
     setAmount(roundedAmount);
   };
@@ -60,8 +56,8 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
   return (
     <div className="space-y-6">
       <DialogHeader>
-        <DialogTitle className="text-2xl font-bold flex items-center">
-          <Smartphone className="h-6 w-6 mr-2 text-green-600" />
+        <DialogTitle className="text-xl font-bold flex items-center">
+          <Smartphone className="h-5 w-5 mr-2 text-green-600" />
           Load Quick Button
         </DialogTitle>
         <DialogDescription>
@@ -70,6 +66,16 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
       </DialogHeader>
 
       <div className="space-y-4">
+        <div>
+          <Label htmlFor="customer-name">Customer Name (Optional)</Label>
+          <Input
+            id="customer-name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="I-type ang pangalan (optional)"
+          />
+        </div>
+
         <div>
           <Label htmlFor="network">Network</Label>
           <Select value={network} onValueChange={setNetwork}>
@@ -94,18 +100,19 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
                 key={commonAmount}
                 variant={amount === commonAmount ? "default" : "outline"}
                 onClick={() => handleAmountChange(commonAmount)}
-                className="h-12"
+                className="h-10 text-sm"
               >
                 ₱{commonAmount}
               </Button>
             ))}
           </div>
           
-          <div className="mt-4">
+          <div className="mt-3">
             <Button
               variant={showOtherAmount ? "default" : "outline"}
               onClick={() => setShowOtherAmount(!showOtherAmount)}
               className="w-full"
+              size="sm"
             >
               Other Amount
             </Button>
@@ -142,7 +149,7 @@ export const LoadQuickModule = ({ onClose }: LoadQuickModuleProps) => {
 
         {amount > 0 && (
           <Card className="bg-green-50 dark:bg-green-950 border-green-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Kita:</span>
                 <span className="text-lg font-bold text-green-600">

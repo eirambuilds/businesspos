@@ -82,15 +82,51 @@ export const useLoad = () => {
       .reduce((sum, sale) => sum + sale.kita, 0);
   };
 
+  const getWeeklyKita = () => {
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return loadSales
+      .filter(sale => new Date(sale.created_at) >= weekStart)
+      .reduce((sum, sale) => sum + sale.kita, 0);
+  };
+
+  const getMonthlyKita = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return loadSales
+      .filter(sale => new Date(sale.created_at) >= monthStart)
+      .reduce((sum, sale) => sum + sale.kita, 0);
+  };
+
+  const getYearlyKita = () => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    return loadSales
+      .filter(sale => new Date(sale.created_at) >= yearStart)
+      .reduce((sum, sale) => sum + sale.kita, 0);
+  };
+
+  const getTodaysLoadSales = () => {
+    const today = new Date().toDateString();
+    return loadSales
+      .filter(sale => new Date(sale.created_at).toDateString() === today)
+      .reduce((sum, sale) => sum + sale.amount, 0);
+  };
+
   useEffect(() => {
     fetchLoadSales();
   }, []);
 
   return {
+    transactions: loadSales, // Add alias for compatibility
     loadSales,
     loading,
     addLoadSale,
     getTodaysKita,
+    getWeeklyKita,
+    getMonthlyKita,
+    getYearlyKita,
+    getTodaysLoadSales,
     fetchLoadSales
   };
 };

@@ -1,480 +1,490 @@
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
+import { useProducts } from '@/hooks/useProducts';
+import { useCredits } from '@/hooks/useCredits';
+import { useCustomers } from '@/hooks/useCustomers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, User, CheckCircle, AlertCircle, ShoppingCart, Smartphone, CreditCard, Receipt } from 'lucide-react';
+import { Package, Smartphone, CreditCard, FileText, Plus, Minus, ShoppingCart, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useCredits } from '@/hooks/useCredits';
-import { useProducts } from '@/hooks/useProducts';
-import { useCustomers } from '@/hooks/useCustomers';
+
+interface CartItem {
+  id: string;
+  type: 'paninda' | 'load' | 'gcash' | 'bills';
+  product_name?: string;
+  product_size?: string;
+  quantity?: number;
+  selling_price?: number;
+  stock?: number;
+  network?: string;
+  transaction_type?: string;
+  bill_type?: string;
+  amount?: number;
+  subtotal: number;
+}
 
 interface UtangModuleProps {
   onClose: () => void;
 }
 
 export const UtangModule = ({ onClose }: UtangModuleProps) => {
-  const { toast } = useToast();
-  const { credits, addCredit, markAsPaid, getTotalUnpaid, fetchCredits } = useCredits();
   const { products } = useProducts();
+  const { addCredit } = useCredits();
   const { customers } = useCustomers();
-  const [activeTab, setActiveTab] = useState('view');
-  const [showAddUtang, setShowAddUtang] = useState(false);
+  const { toast } = useToast();
   
-  const [newUtang, setNewUtang] = useState({
-    customerName: '',
-    type: '',
-    items: [] as any[],
-    totalAmount: 0
-  });
-
-  // Cart for different types of utang
-  const [cart, setCart] = useState<any[]>([]);
-  
-  // Autocomplete states
+  const [activeTab, setActiveTab] = useState('paninda');
+  const [customerName, setCustomerName] = useState('');
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+  
+  // Load states
+  const [loadNetwork, setLoadNetwork] = useState('');
+  const [loadAmount, setLoadAmount] = useState(0);
+  
+  // GCash states
+  const [gcashAmount, setGcashAmount] = useState(0);
+  const [gcashType, setGcashType] = useState('');
+  
+  // Bills states
+  const [billType, setBillType] = useState('');
+  const [billAmount, setBillAmount] = useState(0);
 
-  useEffect(() => {
-    fetchCredits();
-  }, []);
+  const filteredCustomers = customers.filter(customer =>
+    customer.name.toLowerCase().includes(customerName.toLowerCase())
+  );
 
-  // Handle customer name input with autocomplete
-  const handleCustomerNameChange = (value: string) => {
-    setNewUtang(prev => ({ ...prev, customerName: value }));
-    
-    if (value.length > 0) {
-      const filtered = customers.filter(customer =>
-        customer.name.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredCustomers(filtered);
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
+  const addToCart = (item: any, type: 'paninda' | 'load' | 'gcash' | 'bills') => {
+    const cartItem: CartItem = {
+      id: `${type}-${item.id || Date.now()}`,
+      type,
+      ...item,
+      subtotal: item.selling_price || item.amount || 0
+    };
 
-  const selectCustomer = (customerName: string) => {
-    setNewUtang(prev => ({ ...prev, customerName }));
-    setShowSuggestions(false);
-  };
-
-  const addToCart = (item: any, type: string) => {
-    const existingIndex = cart.findIndex(cartItem => 
-      cartItem.id === item.id && cartItem.type === type
-    );
-
-    if (existingIndex > -1) {
-      const updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += 1;
-      setCart(updatedCart);
-    } else {
-      setCart(prev => [...prev, { ...item, type, quantity: 1 }]);
-    }
-  };
-
-  const removeFromCart = (index: number) => {
-    setCart(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const calculateCartTotal = () => {
-    return cart.reduce((total, item) => {
-      switch (item.type) {
-        case 'paninda':
-          return total + (item.selling_price * item.quantity);
-        case 'load':
-          return total + item.amount;
-        case 'gcash':
-          return total + item.amount;
-        case 'bills':
-          return total + item.amount;
-        default:
-          return total;
+    if (type === 'paninda') {
+      const existingItem = cart.find(c => c.id === item.id && c.type === 'paninda');
+      
+      if (existingItem) {
+        updateQuantity(existingItem.id, 1);
+      } else {
+        cartItem.quantity = 1;
+        cartItem.subtotal = item.selling_price;
+        setCart(prev => [...prev, cartItem]);
       }
-    }, 0);
+    } else {
+      setCart(prev => [...prev, cartItem]);
+    }
   };
 
-  const handleAddUtang = async () => {
-    if (!newUtang.customerName || cart.length === 0) {
+  const updateQuantity = (cartItemId: string, change: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        const product = products.find(p => p.id === item.id.replace('paninda-', ''));
+        const newQuantity = Math.max(1, (item.quantity || 1) + change);
+        
+        if (product && newQuantity > product.stock) {
+          toast({
+            title: "Kulang na stock!",
+            description: `May ${product.stock} na lang na ${product.product_name}.`,
+            variant: "destructive"
+          });
+          return item;
+        }
+        
+        return {
+          ...item,
+          quantity: newQuantity,
+          subtotal: (item.selling_price || 0) * newQuantity
+        };
+      }
+      return item;
+    }));
+  };
+
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(item => item.id !== cartItemId));
+  };
+
+  const addLoadToCart = () => {
+    if (!loadNetwork || loadAmount <= 0) {
       toast({
         title: "Kulang ang datos!",
-        description: "I-type ang customer name at magdagdag ng items sa cart.",
+        description: "I-fill ang network at amount.",
         variant: "destructive"
       });
       return;
     }
 
-    const totalAmount = calculateCartTotal();
-    
-    const result = await addCredit(newUtang.customerName, cart, totalAmount);
+    addToCart({
+      network: loadNetwork,
+      amount: loadAmount
+    }, 'load');
+
+    setLoadNetwork('');
+    setLoadAmount(0);
+  };
+
+  const addGcashToCart = () => {
+    if (!gcashType || gcashAmount <= 0) {
+      toast({
+        title: "Kulang ang datos!",
+        description: "I-fill ang transaction type at amount.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    addToCart({
+      transaction_type: gcashType,
+      amount: gcashAmount
+    }, 'gcash');
+
+    setGcashType('');
+    setGcashAmount(0);
+  };
+
+  const addBillToCart = () => {
+    if (!billType || billAmount <= 0) {
+      toast({
+        title: "Kulang ang datos!",
+        description: "I-fill ang bill type at amount.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    addToCart({
+      bill_type: billType,
+      amount: billAmount
+    }, 'bills');
+
+    setBillType('');
+    setBillAmount(0);
+  };
+
+  const getTotalAmount = () => {
+    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+  };
+
+  const handleRecordUtang = async () => {
+    if (!customerName.trim()) {
+      toast({
+        title: "Kulang ang customer name!",
+        description: "I-type ang pangalan ng customer.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (cart.length === 0) {
+      toast({
+        title: "Walang laman ang cart!",
+        description: "Magdagdag ng items sa cart.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const result = await addCredit(customerName, cart, getTotalAmount());
     if (result.success) {
-      setNewUtang({ customerName: '', type: '', items: [], totalAmount: 0 });
+      setCustomerName('');
       setCart([]);
-      setShowAddUtang(false);
-      setActiveTab('view');
+      onClose();
     }
-  };
-
-  const handleMarkAsPaid = async (creditId: string) => {
-    const result = await markAsPaid(creditId);
-    if (result.success) {
-      fetchCredits();
-    }
-  };
-
-  const unpaidCredits = credits.filter(credit => !credit.is_paid);
-  const totalUnpaidAmount = getTotalUnpaid();
-
-  const getCustomersWithUnpaidCredits = () => {
-    const customerCredits = new Map();
-    
-    unpaidCredits.forEach(credit => {
-      const existing = customerCredits.get(credit.customer_name) || {
-        name: credit.customer_name,
-        totalAmount: 0,
-        credits: []
-      };
-      
-      existing.totalAmount += credit.amount_owed;
-      existing.credits.push(credit);
-      customerCredits.set(credit.customer_name, existing);
-    });
-    
-    return Array.from(customerCredits.values());
   };
 
   return (
-    <div className="space-y-6">
-      <DialogHeader>
-        <DialogTitle className="text-2xl font-bold">Customer Credits (Utang)</DialogTitle>
-        <DialogDescription>
-          I-track ang mga utang ng mga customer
-        </DialogDescription>
-      </DialogHeader>
+    <div className="flex space-x-6 max-w-7xl mx-auto">
+      {/* Main Content */}
+      <div className="flex-1 space-y-4">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center">
+            <CreditCard className="h-5 w-5 mr-2 text-orange-600" />
+            Customer Credits (Utang)
+          </DialogTitle>
+          <DialogDescription>
+            I-record ang mga utang ng customers
+          </DialogDescription>
+        </DialogHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Utang</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">₱{totalUnpaidAmount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Hindi pa bayad</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">May Utang</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{getCustomersWithUnpaidCredits().length}</div>
-            <p className="text-xs text-muted-foreground">Customers</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Hindi pa Bayad</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{unpaidCredits.length}</div>
-            <p className="text-xs text-muted-foreground">Transactions</p>
-          </CardContent>
-        </Card>
+        {/* Customer Name Input */}
+        <div>
+          <Label htmlFor="customer-name">Customer Name</Label>
+          <div className="relative">
+            <Input
+              id="customer-name"
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value);
+                setShowSuggestions(e.target.value.length > 0);
+              }}
+              onFocus={() => setShowSuggestions(customerName.length > 0)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              placeholder="I-type ang pangalan ng customer"
+            />
+            
+            {showSuggestions && filteredCustomers.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                {filteredCustomers.slice(0, 5).map((customer) => (
+                  <div
+                    key={customer.id}
+                    className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={() => {
+                      setCustomerName(customer.name);
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    {customer.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="paninda">Paninda</TabsTrigger>
+            <TabsTrigger value="load">Load</TabsTrigger>
+            <TabsTrigger value="gcash">GCash</TabsTrigger>
+            <TabsTrigger value="bills">Bills</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="paninda" className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+              {products.filter(p => p.stock > 0).map((product) => (
+                <Card 
+                  key={product.id}
+                  className="cursor-pointer hover:shadow-lg transition-all"
+                  onClick={() => addToCart(product, 'paninda')}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-sm">{product.product_name}</h4>
+                      <Badge variant="secondary" className="text-xs">
+                        {product.stock} left
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {product.product_type} {product.product_size && `• ${product.product_size}`}
+                      </span>
+                      <span className="font-bold text-blue-600">₱{product.selling_price}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="load" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="load-network">Network</Label>
+                <Select value={loadNetwork} onValueChange={setLoadNetwork}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Piliin ang network type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Globe', 'Smart', 'Sun', 'TM', 'TNT', 'Dito'].map((network) => (
+                      <SelectItem key={network} value={network}>{network}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="load-amount">Amount</Label>
+                <Input
+                  id="load-amount"
+                  type="number"
+                  value={loadAmount || ''}
+                  onChange={(e) => setLoadAmount(Number(e.target.value))}
+                  placeholder="I-enter ang amount"
+                />
+              </div>
+            </div>
+            <Button onClick={addLoadToCart} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Load to Cart
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="gcash" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="gcash-type">Transaction Type</Label>
+                <Select value={gcashType} onValueChange={setGcashType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Piliin ang transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Cash In', 'Cash Out', 'Send Money', 'Pay Bills'].map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="gcash-amount">Amount</Label>
+                <Input
+                  id="gcash-amount"
+                  type="number"
+                  value={gcashAmount || ''}
+                  onChange={(e) => setGcashAmount(Number(e.target.value))}
+                  placeholder="I-enter ang amount"
+                />
+              </div>
+            </div>
+            <Button onClick={addGcashToCart} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Add GCash to Cart
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="bills" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="bill-type">Bill Type</Label>
+                <Select value={billType} onValueChange={setBillType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Piliin ang bill type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Meralco', 'Maynilad', 'PLDT', 'Globe', 'Smart', 'Cignal', 'SSS', 'PhilHealth'].map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="bill-amount">Amount</Label>
+                <Input
+                  id="bill-amount"
+                  type="number"
+                  value={billAmount || ''}
+                  onChange={(e) => setBillAmount(Number(e.target.value))}
+                  placeholder="I-enter ang amount"
+                />
+              </div>
+            </div>
+            <Button onClick={addBillToCart} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Bill to Cart
+            </Button>
+          </TabsContent>
+        </Tabs>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="view">Mga Customer</TabsTrigger>
-          <TabsTrigger value="records">Lahat ng Utang</TabsTrigger>
-          <TabsTrigger value="manage">I-manage</TabsTrigger>
-        </TabsList>
+      {/* Cart Sidebar */}
+      <div className="w-80 bg-gray-50 dark:bg-gray-800 border rounded-lg p-4">
+        <div className="flex items-center mb-4">
+          <ShoppingCart className="h-5 w-5 mr-2" />
+          <h3 className="font-semibold">Cart ({cart.length})</h3>
+        </div>
 
-        <TabsContent value="view" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Mga Customer na May Utang</h3>
-            <Button onClick={() => setShowAddUtang(true)} className="bg-blue-500 hover:bg-blue-600">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Utang
-            </Button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {getCustomersWithUnpaidCredits().map((customer, index) => (
-              <Card key={index} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{customer.name}</CardTitle>
-                      <CardDescription>
-                        {customer.credits.length} unpaid transaction{customer.credits.length > 1 ? 's' : ''}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="destructive">
-                      ₱{customer.totalAmount.toLocaleString()}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {customer.credits.slice(0, 2).map((credit) => (
-                      <div key={credit.id} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium">₱{credit.amount_owed}</span>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => handleMarkAsPaid(credit.id)}
-                            className="h-6 text-green-600 hover:text-green-700"
-                          >
-                            <CheckCircle className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(credit.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="records" className="space-y-4">
-          <h3 className="text-lg font-semibold">Lahat ng Utang Records</h3>
-          
-          <div className="space-y-3">
-            {credits.map((credit) => (
-              <Card key={credit.id} className={credit.is_paid ? 'bg-green-50 dark:bg-green-950 border-green-200' : 'border-red-200'}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
+        <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+          {cart.map((item) => {
+            const Icon = item.type === 'paninda' ? Package :
+                       item.type === 'load' ? Smartphone :
+                       item.type === 'gcash' ? CreditCard : FileText;
+            
+            return (
+              <Card key={item.id} className="p-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 flex-1">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h4 className="font-semibold">{credit.customer_name}</h4>
-                        <Badge variant={credit.is_paid ? "default" : "destructive"}>
-                          {credit.is_paid ? "Bayad na" : "Hindi pa bayad"}
-                        </Badge>
+                      <div className="font-semibold text-xs">
+                        {item.product_name || item.network || item.transaction_type || item.bill_type}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(credit.created_at).toLocaleDateString()} 
-                        {credit.is_paid && credit.paid_date && ` • Nabayad: ${new Date(credit.paid_date).toLocaleDateString()}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold">₱{credit.amount_owed}</p>
-                      {!credit.is_paid && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleMarkAsPaid(credit.id)}
-                          className="mt-2 border-green-500 text-green-600 hover:bg-green-50"
-                        >
-                          Mark as Paid
-                        </Button>
+                      {item.product_size && (
+                        <div className="text-xs text-muted-foreground">{item.product_size}</div>
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="manage" className="space-y-4">
-          <div className="text-center text-muted-foreground">
-            <FileText className="h-12 w-12 mx-auto mb-4" />
-            <p>Manage utang records, send reminders, generate reports</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Add Utang Dialog */}
-      <Dialog open={showAddUtang} onOpenChange={setShowAddUtang}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Magdagdag ng Utang</DialogTitle>
-            <DialogDescription>
-              I-record ang bagong utang
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative">
-              <Label htmlFor="customer-name">Customer Name</Label>
-              <Input
-                id="customer-name"
-                value={newUtang.customerName}
-                onChange={(e) => handleCustomerNameChange(e.target.value)}
-                placeholder="I-type ang pangalan ng customer..."
-                onFocus={() => newUtang.customerName && setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              />
-              
-              {/* Autocomplete Suggestions */}
-              {showSuggestions && filteredCustomers.length > 0 && (
-                <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
-                  {filteredCustomers.map((customer) => (
-                    <button
-                      key={customer.id}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
-                      onClick={() => selectCustomer(customer.name)}
-                    >
-                      {customer.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Tabs value={newUtang.type} onValueChange={(value) => setNewUtang(prev => ({ ...prev, type: value }))}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="paninda">Paninda</TabsTrigger>
-                <TabsTrigger value="load">Load</TabsTrigger>
-                <TabsTrigger value="gcash">GCash</TabsTrigger>
-                <TabsTrigger value="bills">Bills</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="paninda" className="space-y-4">
-                <h4 className="font-semibold flex items-center">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Mga Produkto
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                  {products.filter(p => p.stock > 0).map((product) => (
-                    <Button
-                      key={product.id}
-                      variant="outline"
-                      onClick={() => addToCart(product, 'paninda')}
-                      className="h-20 flex flex-col items-center justify-center text-xs"
-                    >
-                      <span className="font-medium">{product.product_name}</span>
-                      <span className="text-muted-foreground">₱{product.selling_price}</span>
-                      <span className="text-xs">Stock: {product.stock}</span>
-                    </Button>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="load" className="space-y-4">
-                <h4 className="font-semibold flex items-center">
-                  <Smartphone className="h-4 w-4 mr-2" />
-                  Load Options
-                </h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {[15, 20, 25, 30, 50, 100, 150, 200, 300, 500].map((amount) => (
-                    <Button
-                      key={amount}
-                      variant="outline"
-                      onClick={() => addToCart({ id: `load-${amount}`, name: `Load ₱${amount}`, amount }, 'load')}
-                      className="h-12"
-                    >
-                      ₱{amount}
-                    </Button>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="gcash" className="space-y-4">
-                <h4 className="font-semibold flex items-center">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  GCash Options
-                </h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {[100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000].map((amount) => (
-                    <Button
-                      key={amount}
-                      variant="outline"
-                      onClick={() => addToCart({ id: `gcash-${amount}`, name: `GCash ₱${amount}`, amount }, 'gcash')}
-                      className="h-12"
-                    >
-                      ₱{amount}
-                    </Button>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="bills" className="space-y-4">
-                <h4 className="font-semibold flex items-center">
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Bills Options
-                </h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {[100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000].map((amount) => (
-                    <Button
-                      key={amount}
-                      variant="outline"
-                      onClick={() => addToCart({ id: `bills-${amount}`, name: `Bills ₱${amount}`, amount }, 'bills')}
-                      className="h-12"
-                    >
-                      ₱{amount}
-                    </Button>
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Cart */}
-            {cart.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Cart</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {cart.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                        <div>
-                          <span className="font-medium">
-                            {item.type === 'paninda' ? item.product_name : item.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            x{item.quantity}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold">
-                            ₱{item.type === 'paninda' ? (item.selling_price * item.quantity) : item.amount}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeFromCart(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            ×
-                          </Button>
-                        </div>
+                  
+                  <div className="flex items-center space-x-1">
+                    {item.type === 'paninda' && (
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, -1)}
+                          className="h-5 w-5 p-0"
+                        >
+                          <Minus className="h-2 w-2" />
+                        </Button>
+                        <span className="text-xs w-6 text-center">{item.quantity}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, 1)}
+                          className="h-5 w-5 p-0"
+                        >
+                          <Plus className="h-2 w-2" />
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between items-center font-bold text-lg">
-                      <span>Total:</span>
-                      <span>₱{calculateCartTotal().toLocaleString()}</span>
+                    )}
+                    
+                    <div className="text-xs font-semibold w-12 text-right">
+                      ₱{item.subtotal}
                     </div>
+                    
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removeFromCart(item.id)}
+                      className="h-5 w-5 p-0 text-red-500"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
-                </CardContent>
+                </div>
               </Card>
-            )}
+            );
+          })}
+        </div>
 
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowAddUtang(false)} className="flex-1">
-                Cancel
+        {cart.length > 0 && (
+          <div className="border-t pt-4">
+            <div className="flex justify-between items-center text-lg font-bold mb-4">
+              <span>Total:</span>
+              <span className="text-orange-600">₱{getTotalAmount().toLocaleString()}</span>
+            </div>
+            
+            <div className="space-y-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setCart([])}
+                className="w-full"
+              >
+                Clear Cart
               </Button>
-              <Button onClick={handleAddUtang} className="flex-1 bg-blue-500 hover:bg-blue-600">
-                Idagdag ang Utang
+              <Button 
+                onClick={handleRecordUtang}
+                className="w-full bg-orange-500 hover:bg-orange-600"
+              >
+                Record Utang
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+
+        {cart.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <ShoppingCart className="h-12 w-12 mx-auto mb-4" />
+            <p className="text-sm">Walang laman ang cart</p>
+            <p className="text-xs">Magdagdag ng items</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -7,8 +6,10 @@ export interface Credit {
   id: string;
   customer_name: string;
   amount_owed: number;
+  total_amount: number; // Add alias for compatibility
   items: any[];
   is_paid: boolean;
+  status: 'paid' | 'unpaid'; // Add computed status
   paid_date?: string;
   created_at: string;
 }
@@ -27,12 +28,14 @@ export const useCredits = () => {
 
       if (error) throw error;
       
-      // Cast the data to proper types
+      // Cast the data to proper types and add computed properties
       const typedCredits = (data || []).map(credit => ({
         ...credit,
         items: Array.isArray(credit.items) ? credit.items : 
                typeof credit.items === 'string' ? JSON.parse(credit.items) : [],
-        is_paid: credit.is_paid || false
+        is_paid: credit.is_paid || false,
+        total_amount: credit.amount_owed, // Add alias
+        status: (credit.is_paid ? 'paid' : 'unpaid') as 'paid' | 'unpaid' // Add computed status
       }));
       
       setCredits(typedCredits);
@@ -97,6 +100,55 @@ export const useCredits = () => {
     }
   };
 
+  const addToRevenue = async (credit: any) => {
+    // Check if items contain load, gcash, or bills services
+    const itemsArray = Array.isArray(credit.items) ? credit.items :
+                      typeof credit.items === 'string' ? JSON.parse(credit.items) : [];
+    
+    for (const item of itemsArray) {
+      if (item && item.type === 'load') {
+        // Add to load sales
+        const { error } = await supabase
+          .from('load_sales')
+          .insert([{
+            network: item.network || 'Unknown',
+            amount: item.amount || (item.selling_price * (item.quantity || 1)),
+            kita: item.kita || ((item.amount || (item.selling_price * (item.quantity || 1))) * 0.05) // Default 5% commission if not specified
+          }]);
+        
+        if (error) console.error('Error adding to load sales:', error);
+      } else if (item && item.type === 'gcash') {
+        // Add to gcash transactions
+        const { error } = await supabase
+          .from('gcash_transactions')
+          .insert([{
+            transaction_type: item.transaction_type || 'Cash In',
+            amount: item.amount || (item.selling_price * (item.quantity || 1)),
+            kita: item.kita || ((item.amount || (item.selling_price * (item.quantity || 1))) * 0.02) // Default 2% commission if not specified
+          }]);
+        
+        if (error) console.error('Error adding to gcash transactions:', error);
+      } else if (item && item.type === 'bills') {
+        // Add to bills payments
+        const calculatedAmount = item.amount || (item.selling_price * (item.quantity || 1));
+        const { error } = await supabase
+          .from('bills_payments')
+          .insert([{
+            bill_type: item.bill_type || 'Unknown',
+            amount: calculatedAmount,
+            commission: item.commission || calculateBillsCommission(calculatedAmount)
+          }]);
+        
+        if (error) console.error('Error adding to bills payments:', error);
+      }
+    }
+  };
+
+  const calculateBillsCommission = (amount: number): number => {
+    if (amount < 5) return 0;
+    return amount <= 1000 ? Math.ceil(Math.max(amount, 500) / 500) * 10 : 20 + Math.floor((amount - 1000) / 500) * 10;
+  };
+
   const markAsPaid = async (creditId: string) => {
     try {
       // Get the credit details first
@@ -107,6 +159,7 @@ export const useCredits = () => {
         .single();
 
       if (fetchError) throw fetchError;
+      if (!credit) throw new Error('Credit not found');
 
       // Update the credit as paid
       const { error } = await supabase
@@ -119,7 +172,10 @@ export const useCredits = () => {
 
       if (error) throw error;
 
-      // Now record sales for each item to add to profit
+      // Add to revenue if items contain load, gcash, or bills
+      await addToRevenue(credit);
+
+      // Now record sales for products to add to profit
       const itemsArray = Array.isArray(credit.items) ? credit.items :
                         typeof credit.items === 'string' ? JSON.parse(credit.items) : [];
       
@@ -144,7 +200,7 @@ export const useCredits = () => {
       
       toast({
         title: "Utang nabayad!",
-        description: "Utang ay na-mark as paid na at naidagdag na sa sales."
+        description: "Utang ay na-mark as paid na at naidagdag na sa revenue."
       });
       
       fetchCredits();
@@ -160,10 +216,59 @@ export const useCredits = () => {
     }
   };
 
+  const updateCreditStatus = async (creditId: string, newStatus: 'paid' | 'unpaid') => {
+    if (newStatus === 'paid') {
+      return await markAsPaid(creditId);
+    } else {
+      try {
+        const { error } = await supabase
+          .from('credits')
+          .update({
+            is_paid: false,
+            paid_date: null
+          })
+          .eq('id', creditId);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Status updated!",
+          description: `Credit status changed to ${newStatus}.`
+        });
+        
+        fetchCredits();
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating credit status:', error);
+        toast({
+          title: "Error sa pag-update ng utang",
+          description: "Hindi ma-update ang utang.",
+          variant: "destructive"
+        });
+        return { success: false };
+      }
+    }
+  };
+
   const getTotalUnpaid = () => {
     return credits
       .filter(credit => !credit.is_paid)
       .reduce((sum, credit) => sum + credit.amount_owed, 0);
+  };
+
+  // Group credits by customer name (case-insensitive)
+  const getGroupedCredits = () => {
+    const grouped: { [key: string]: Credit[] } = {};
+    
+    credits.forEach(credit => {
+      const normalizedName = credit.customer_name.toLowerCase().trim();
+      if (!grouped[normalizedName]) {
+        grouped[normalizedName] = [];
+      }
+      grouped[normalizedName].push(credit);
+    });
+    
+    return grouped;
   };
 
   useEffect(() => {
@@ -175,7 +280,9 @@ export const useCredits = () => {
     loading,
     addCredit,
     markAsPaid,
+    updateCreditStatus,
     getTotalUnpaid,
+    getGroupedCredits,
     fetchCredits
   };
 };

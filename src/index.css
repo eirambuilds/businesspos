@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -99,5 +100,77 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Increase base font size for better readability */
+    font-size: 18px;
+    line-height: 1.7;
+  }
+
+  /* Enhanced readability for older users */
+  .elderly-friendly {
+    font-size: 1.125rem; /* 18px base */
+  }
+
+  .elderly-friendly h1 {
+    font-size: 2.5rem; /* Larger headings */
+    line-height: 1.3;
+  }
+
+  .elderly-friendly h2 {
+    font-size: 2rem;
+    line-height: 1.4;
+  }
+
+  .elderly-friendly h3 {
+    font-size: 1.75rem;
+    line-height: 1.4;
+  }
+
+  .elderly-friendly h4 {
+    font-size: 1.5rem;
+    line-height: 1.4;
+  }
+
+  .elderly-friendly p {
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+
+  /* Larger buttons for easier clicking */
+  .elderly-friendly button {
+    min-height: 3.5rem; /* 56px */
+    font-size: 1.125rem;
+    padding: 1rem 1.5rem;
+  }
+
+  /* Larger form elements */
+  .elderly-friendly input,
+  .elderly-friendly select,
+  .elderly-friendly textarea {
+    min-height: 3.5rem;
+    font-size: 1.125rem;
+    padding: 1rem;
+  }
+
+  /* Improved contrast and spacing */
+  .elderly-friendly .card {
+    border-width: 2px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Larger badges and status indicators */
+  .elderly-friendly .badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+  }
+
+  /* Improved table readability */
+  .elderly-friendly table {
+    font-size: 1.125rem;
+  }
+
+  .elderly-friendly td,
+  .elderly-friendly th {
+    padding: 1rem;
   }
 }

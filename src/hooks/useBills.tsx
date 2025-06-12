@@ -82,15 +82,51 @@ export const useBills = () => {
       .reduce((sum, payment) => sum + payment.commission, 0);
   };
 
+  const getWeeklyKita = () => {
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return billPayments
+      .filter(payment => new Date(payment.created_at) >= weekStart)
+      .reduce((sum, payment) => sum + payment.commission, 0);
+  };
+
+  const getMonthlyKita = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return billPayments
+      .filter(payment => new Date(payment.created_at) >= monthStart)
+      .reduce((sum, payment) => sum + payment.commission, 0);
+  };
+
+  const getYearlyKita = () => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    return billPayments
+      .filter(payment => new Date(payment.created_at) >= yearStart)
+      .reduce((sum, payment) => sum + payment.commission, 0);
+  };
+
+  const getTodaysBillsSales = () => {
+    const today = new Date().toDateString();
+    return billPayments
+      .filter(payment => new Date(payment.created_at).toDateString() === today)
+      .reduce((sum, payment) => sum + payment.amount, 0);
+  };
+
   useEffect(() => {
     fetchBillPayments();
   }, []);
 
   return {
+    transactions: billPayments, // Add alias for compatibility
     billPayments,
     loading,
     addBillPayment,
     getTodaysKita,
+    getWeeklyKita,
+    getMonthlyKita,
+    getYearlyKita,
+    getTodaysBillsSales,
     fetchBillPayments
   };
 };

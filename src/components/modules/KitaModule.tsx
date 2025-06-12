@@ -5,283 +5,271 @@ import { useSales } from '@/hooks/useSales';
 import { useGcash } from '@/hooks/useGcash';
 import { useLoad } from '@/hooks/useLoad';
 import { useBills } from '@/hooks/useBills';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useExpenses } from '@/hooks/useExpenses';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Package, Smartphone, CreditCard, FileText, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TrendingUp, Download, DollarSign, Package, Smartphone, CreditCard, FileText } from 'lucide-react';
 
 interface KitaModuleProps {
   onClose: () => void;
 }
 
 export const KitaModule = ({ onClose }: KitaModuleProps) => {
-  const [activeTab, setActiveTab] = useState('today');
   const { products } = useProducts();
-  const { getTodaysSales } = useSales();
-  const { getTodaysKita: getGcashKita, transactions: gcashTransactions } = useGcash();
-  const { getTodaysKita: getLoadKita, loadSales } = useLoad();
-  const { getTodaysKita: getBillsKita, billPayments } = useBills();
+  const { sales, getTodaysSales, getWeeklySales, getMonthlySales, getYearlySales } = useSales();
+  const { transactions: gcashTransactions, getTodaysKita: getGcashTodaysKita, getWeeklyKita: getGcashWeeklyKita, getMonthlyKita: getGcashMonthlyKita, getYearlyKita: getGcashYearlyKita } = useGcash();
+  const { transactions: loadTransactions, getTodaysKita: getLoadTodaysKita, getWeeklyKita: getLoadWeeklyKita, getMonthlyKita: getLoadMonthlyKita, getYearlyKita: getLoadYearlyKita } = useLoad();
+  const { transactions: billsTransactions, getTodaysKita: getBillsTodaysKita, getWeeklyKita: getBillsWeeklyKita, getMonthlyKita: getBillsMonthlyKita, getYearlyKita: getBillsYearlyKita } = useBills();
+  const { expenses } = useExpenses();
+  
+  const [activeTab, setActiveTab] = useState('ngayon');
 
-  // Calculate different periods
-  const calculatePeriodData = (period: 'today' | 'weekly' | 'monthly' | 'yearly') => {
+  // Calculate profits for different periods
+  const calculateProfits = (period: 'today' | 'week' | 'month' | 'year') => {
+    let productsSales, gcashKita, loadKita, billsKita, periodExpenses;
+    
     const now = new Date();
-    let startDate: Date;
     
     switch (period) {
       case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        productsSales = getTodaysSales();
+        gcashKita = getGcashTodaysKita();
+        loadKita = getLoadTodaysKita();
+        billsKita = getBillsTodaysKita();
+        periodExpenses = expenses.filter(e => 
+          new Date(e.created_at).toDateString() === now.toDateString()
+        ).reduce((sum, e) => sum + e.amount, 0);
         break;
-      case 'weekly':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      case 'week':
+        productsSales = getWeeklySales();
+        gcashKita = getGcashWeeklyKita();
+        loadKita = getLoadWeeklyKita();
+        billsKita = getBillsWeeklyKita();
+        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+        periodExpenses = expenses.filter(e => 
+          new Date(e.created_at) >= weekStart
+        ).reduce((sum, e) => sum + e.amount, 0);
         break;
-      case 'monthly':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      case 'month':
+        productsSales = getMonthlySales();
+        gcashKita = getGcashMonthlyKita();
+        loadKita = getLoadMonthlyKita();
+        billsKita = getBillsMonthlyKita();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        periodExpenses = expenses.filter(e => 
+          new Date(e.created_at) >= monthStart
+        ).reduce((sum, e) => sum + e.amount, 0);
         break;
-      case 'yearly':
-        startDate = new Date(now.getFullYear(), 0, 1);
+      case 'year':
+        productsSales = getYearlySales();
+        gcashKita = getGcashYearlyKita();
+        loadKita = getLoadYearlyKita();
+        billsKita = getBillsYearlyKita();
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        periodExpenses = expenses.filter(e => 
+          new Date(e.created_at) >= yearStart
+        ).reduce((sum, e) => sum + e.amount, 0);
         break;
     }
 
-    // Calculate GCash kita
-    const gcashKita = gcashTransactions
-      .filter(t => new Date(t.created_at) >= startDate)
-      .reduce((sum, t) => sum + t.kita, 0);
-
-    // Calculate Load kita
-    const loadKita = loadSales
-      .filter(s => new Date(s.created_at) >= startDate)
-      .reduce((sum, s) => sum + s.kita, 0);
-
-    // Calculate Bills kita
-    const billsKita = billPayments
-      .filter(p => new Date(p.created_at) >= startDate)
-      .reduce((sum, p) => sum + p.commission, 0);
-
-    // For products kita, we'd need actual sales data - using estimated for now
-    const productKita = getTodaysSales() * 0.2; // Assuming 20% profit margin
+    // Estimate product profit (20% margin)
+    const productsKita = productsSales * 0.2;
+    
+    const grossProfit = productsKita + gcashKita + loadKita + billsKita;
+    const netProfit = grossProfit - periodExpenses;
 
     return {
-      total: productKita + gcashKita + loadKita + billsKita,
-      products: productKita,
-      gcash: gcashKita,
-      load: loadKita,
-      bills: billsKita
+      products: { sales: productsSales, kita: productsKita },
+      gcash: { kita: gcashKita },
+      load: { kita: loadKita },
+      bills: { kita: billsKita },
+      grossProfit,
+      expenses: periodExpenses,
+      netProfit
     };
   };
 
-  const periodData = {
-    today: calculatePeriodData('today'),
-    weekly: calculatePeriodData('weekly'),
-    monthly: calculatePeriodData('monthly'),
-    yearly: calculatePeriodData('yearly')
+  const exportData = (period: string) => {
+    const data = calculateProfits(period as any);
+    const csvContent = [
+      ['Category', 'Sales', 'Profit'],
+      ['Products', data.products.sales, data.products.kita],
+      ['GCash', '', data.gcash.kita],
+      ['Load', '', data.load.kita],
+      ['Bills', '', data.bills.kita],
+      ['', '', ''],
+      ['Gross Profit', '', data.grossProfit],
+      ['Expenses', '', data.expenses],
+      ['Net Profit', '', data.netProfit]
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `kita-${period}-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  const renderKitaCards = (period: 'today' | 'weekly' | 'monthly' | 'yearly') => {
-    const data = periodData[period];
-    const cards = [
-      {
-        title: 'Kita sa Produkto',
-        amount: data.products,
-        icon: Package,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-100 dark:bg-blue-900'
-      },
-      {
-        title: 'Kita sa Load',
-        amount: data.load,
-        icon: Smartphone,
-        color: 'text-green-600',
-        bgColor: 'bg-green-100 dark:bg-green-900'
-      },
-      {
-        title: 'Kita sa GCash',
-        amount: data.gcash,
-        icon: CreditCard,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-100 dark:bg-purple-900'
-      },
-      {
-        title: 'Kita sa Bills',
-        amount: data.bills,
-        icon: FileText,
-        color: 'text-orange-600',
-        bgColor: 'bg-orange-100 dark:bg-orange-900'
-      }
-    ];
-
+  const renderProfitCard = (period: 'today' | 'week' | 'month' | 'year') => {
+    const data = calculateProfits(period);
+    
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card, index) => (
-          <Card key={index} className="transition-all hover:shadow-lg">
+      <div className="space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-green-50 dark:bg-green-950 border-green-200">
             <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                  <card.icon className={`h-5 w-5 ${card.color}`} />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{card.title}</p>
-                  <p className={`text-lg font-bold ${card.color}`}>
-                    ₱{card.amount.toLocaleString()}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Gross Profit</p>
+                  <p className="text-2xl font-bold text-green-600">₱{data.grossProfit.toLocaleString()}</p>
                 </div>
+                <TrendingUp className="h-8 w-8 text-green-400" />
               </div>
             </CardContent>
           </Card>
-        ))}
+
+          <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Expenses</p>
+                  <p className="text-2xl font-bold text-red-600">₱{data.expenses.toLocaleString()}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-red-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Profit</p>
+                  <p className="text-2xl font-bold text-blue-600">₱{data.netProfit.toLocaleString()}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Breakdown by Category */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center">
+                <Package className="h-4 w-4 mr-2 text-purple-600" />
+                Products
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-lg font-bold">₱{data.products.sales.toLocaleString()}</div>
+                <div className="text-sm text-purple-600">Kita: ₱{data.products.kita.toLocaleString()}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center">
+                <CreditCard className="h-4 w-4 mr-2 text-blue-600" />
+                GCash
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-lg font-bold text-blue-600">₱{data.gcash.kita.toLocaleString()}</div>
+                <div className="text-sm text-muted-foreground">Profit only</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center">
+                <Smartphone className="h-4 w-4 mr-2 text-green-600" />
+                Load
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-lg font-bold text-green-600">₱{data.load.kita.toLocaleString()}</div>
+                <div className="text-sm text-muted-foreground">Profit only</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center">
+                <FileText className="h-4 w-4 mr-2 text-orange-600" />
+                Bills
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-lg font-bold text-orange-600">₱{data.bills.kita.toLocaleString()}</div>
+                <div className="text-sm text-muted-foreground">Profit only</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Export Button */}
+        <div className="flex justify-center">
+          <Button onClick={() => exportData(period)} className="bg-green-500 hover:bg-green-600">
+            <Download className="h-4 w-4 mr-2" />
+            Export {period.charAt(0).toUpperCase() + period.slice(1)} Report
+          </Button>
+        </div>
       </div>
     );
   };
 
-  const getTabLabel = (tab: string) => {
-    switch (tab) {
-      case 'today': return 'Ngayon';
-      case 'weekly': return 'Ngayong Linggo';
-      case 'monthly': return 'Ngayong Buwan';
-      case 'yearly': return 'Ngayong Taon';
-      default: return 'Ngayon';
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      <DialogHeader>
-        <DialogTitle className="text-2xl font-bold">Kita (Profit Tracking)</DialogTitle>
-        <DialogDescription>
-          Tingnan ang inyong kita sa iba't ibang serbisyo
-        </DialogDescription>
-      </DialogHeader>
-
-      {/* Total Kita Card */}
-      <Card className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 border-green-200">
-        <CardHeader className="text-center">
-          <div className="mx-auto p-3 bg-green-500 text-white rounded-full w-fit mb-4">
-            <TrendingUp className="h-8 w-8" />
-          </div>
-          <CardTitle className="text-3xl font-bold text-green-600">
-            ₱{periodData[activeTab as keyof typeof periodData].total.toLocaleString()}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold flex items-center">
+            <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+            Kita (Profit Tracking)
           </CardTitle>
-          <CardDescription className="text-lg">
-            Kabuuang Kita {getTabLabel(activeTab)}
-          </CardDescription>
-          <div className="mt-4">
-            <Badge className="bg-green-500 text-white text-lg px-4 py-2">
-              Magaling, Ma! 🎉
-            </Badge>
-          </div>
         </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="ngayon">Ngayon (Today)</TabsTrigger>
+              <TabsTrigger value="linggo">Linggo (Week)</TabsTrigger>
+              <TabsTrigger value="buwan">Buwan (Month)</TabsTrigger>
+              <TabsTrigger value="taon">Taon (Year)</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="ngayon" className="mt-6">
+              {renderProfitCard('today')}
+            </TabsContent>
+
+            <TabsContent value="linggo" className="mt-6">
+              {renderProfitCard('week')}
+            </TabsContent>
+
+            <TabsContent value="buwan" className="mt-6">
+              {renderProfitCard('month')}
+            </TabsContent>
+
+            <TabsContent value="taon" className="mt-6">
+              {renderProfitCard('year')}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       </Card>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="today">Ngayon</TabsTrigger>
-          <TabsTrigger value="weekly">Linggo</TabsTrigger>
-          <TabsTrigger value="monthly">Buwan</TabsTrigger>
-          <TabsTrigger value="yearly">Taon</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="today" className="space-y-6">
-          {renderKitaCards('today')}
-          
-          {/* Today's Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                Breakdown ng Kita Ngayon
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-sm">Product Sales</h4>
-                    <p className="text-xs text-muted-foreground">From store inventory</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">₱{periodData.today.products.toLocaleString()}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-sm">GCash Services</h4>
-                    <p className="text-xs text-muted-foreground">{gcashTransactions.filter(t => new Date(t.created_at).toDateString() === new Date().toDateString()).length} transactions</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">₱{periodData.today.gcash.toLocaleString()}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-sm">Load Sales</h4>
-                    <p className="text-xs text-muted-foreground">{loadSales.filter(s => new Date(s.created_at).toDateString() === new Date().toDateString()).length} transactions</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">₱{periodData.today.load.toLocaleString()}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-sm">Bills Payment</h4>
-                    <p className="text-xs text-muted-foreground">{billPayments.filter(p => new Date(p.created_at).toDateString() === new Date().toDateString()).length} transactions</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">₱{periodData.today.bills.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="weekly" className="space-y-6">
-          {renderKitaCards('weekly')}
-        </TabsContent>
-
-        <TabsContent value="monthly" className="space-y-6">
-          {renderKitaCards('monthly')}
-        </TabsContent>
-
-        <TabsContent value="yearly" className="space-y-6">
-          {renderKitaCards('yearly')}
-        </TabsContent>
-      </Tabs>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200">
-          <CardContent className="p-4 text-center">
-            <Package className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-            <p className="text-sm text-muted-foreground">Top Service</p>
-            <p className="font-bold text-blue-600">
-              {periodData.today.products > periodData.today.gcash && periodData.today.products > periodData.today.load && periodData.today.products > periodData.today.bills ? 'Products' :
-               periodData.today.gcash > periodData.today.load && periodData.today.gcash > periodData.today.bills ? 'GCash' :
-               periodData.today.load > periodData.today.bills ? 'Load' : 'Bills'}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-green-50 dark:bg-green-950 border-green-200">
-          <CardContent className="p-4 text-center">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-600" />
-            <p className="text-sm text-muted-foreground">Daily Average</p>
-            <p className="font-bold text-green-600">₱{Math.round(periodData.monthly.total / new Date().getDate()).toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-purple-50 dark:bg-purple-950 border-purple-200">
-          <CardContent className="p-4 text-center">
-            <Smartphone className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-            <p className="text-sm text-muted-foreground">Service Income</p>
-            <p className="font-bold text-purple-600">
-              {Math.round(((periodData.today.gcash + periodData.today.load + periodData.today.bills) / periodData.today.total) * 100)}%
-            </p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };

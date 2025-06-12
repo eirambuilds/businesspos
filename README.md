@@ -1,4 +1,4 @@
-# Welcome to Business POS System
+# Welcome to Business POS Management System
 
 ## Technologies Used
 
@@ -15,7 +15,7 @@ This project is built with:
 The site is deployed via Vercel and hosted at:
 
 ```
-https://posandinvsystem.vercel.app/
+https://businesspos.vercel.app/
 ```
 
 ## Contact & Support

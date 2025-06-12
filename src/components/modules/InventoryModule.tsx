@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
@@ -9,8 +8,11 @@ import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/di
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Edit, Trash2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, Package, Edit, Trash2, TrendingUp, AlertTriangle, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { EditProductModal } from './EditProductModal';
+import { DeleteProductModal } from './DeleteProductModal';
+import { InventoryReportsModule } from './InventoryReportsModule';
 
 interface InventoryModuleProps {
   onClose: () => void;
@@ -21,7 +23,9 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [deletingProduct, setDeletingProduct] = useState<any>(null);
   const [restockQuantities, setRestockQuantities] = useState<{[key: string]: string}>({});
+  const [activeTab, setActiveTab] = useState('manage');
   
   const [newProduct, setNewProduct] = useState({
     product_name: '',
@@ -100,18 +104,8 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
   const outOfStockProducts = products.filter(p => p.stock === 0);
   const totalValue = products.reduce((sum, p) => sum + (p.selling_price * p.stock), 0);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Inventory Management</DialogTitle>
-          <DialogDescription>Loading...</DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
+  if (activeTab === 'reports') {
+    return <InventoryReportsModule onClose={onClose} />;
   }
 
   return (
@@ -165,7 +159,7 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
         </Card>
       </div>
 
-      <Tabs defaultValue="manage">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="manage">I-manage</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -205,7 +199,6 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      {/* Flexible Restock Input */}
                       <div className="flex items-center space-x-1">
                         <Input
                           type="number"
@@ -221,8 +214,7 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
                           disabled={!restockQuantities[product.id] || parseInt(restockQuantities[product.id]) <= 0}
                           className="h-8 px-2 text-xs bg-green-500 hover:bg-green-600"
                         >
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          Restock
+                          <Check className="h-3 w-3" />
                         </Button>
                       </div>
                       
@@ -238,6 +230,7 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => setDeletingProduct(product)}
                         className="h-8 px-2 text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -294,13 +287,6 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          <div className="text-center text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-4" />
-            <p>Inventory reports and analytics</p>
-          </div>
         </TabsContent>
       </Tabs>
 
@@ -396,6 +382,18 @@ export const InventoryModule = ({ onClose }: InventoryModuleProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EditProductModal
+        product={editingProduct}
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+      />
+
+      <DeleteProductModal
+        product={deletingProduct}
+        isOpen={!!deletingProduct}
+        onClose={() => setDeletingProduct(null)}
+      />
     </div>
   );
 };

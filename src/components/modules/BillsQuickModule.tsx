@@ -24,14 +24,9 @@ export const BillsQuickModule = ({ onClose }: BillsQuickModuleProps) => {
   const billTypes = ['Meralco', 'Manila Water', 'Globe', 'PLDT', 'Sky', 'Converge', 'SSS', 'PhilHealth', 'Pag-IBIG'];
   const commonAmounts = [100, 200, 300, 500, 1000, 1500, 2000, 2500, 3000, 5000];
 
-  const calculateCommission = (billAmount: number) => {
-    if (billAmount >= 5 && billAmount <= 500) return 10;
-    if (billAmount >= 501 && billAmount <= 1000) return 20;
-    
-    // For amounts above 1000, add 10 pesos for every 500 increment
-    const excess = billAmount - 1000;
-    const additionalCommission = Math.floor(excess / 500) * 10;
-    return 20 + additionalCommission;
+  const calculateCommission = (billAmount: number): number => {
+    if (billAmount < 5) return 0;
+    return billAmount <= 1000 ? Math.ceil(Math.max(billAmount, 500) / 500) * 10 : 20 + Math.floor((billAmount - 1000) / 500) * 10;
   };
 
   const handleAmountChange = (value: number) => {
